@@ -169,21 +169,36 @@ npm run dev              # http://localhost:5173
 
 ## Deploying
 
-- **Backend → Render**: push `backend/` as its own service using the
-  included `render.yaml` — it now provisions a free Postgres database
-  automatically and auto-generates `JWT_SECRET`. You still need to set
-  `ANTHROPIC_API_KEY` and, once the PDF service is deployed,
-  `PDF_SERVICE_URL` in the Render dashboard. Render suits this better
-  than Vercel serverless functions because file processing and
-  multi-step Claude tool loops can run longer than typical serverless
-  timeouts, and it needs a writable disk for uploads/outputs.
-- **Frontend → Vercel**: push `frontend/` as its own project. Set
-  `VITE_BACKEND_URL` to your Render backend's URL in Vercel's env vars.
-- **PDF microservice → Render**: push `pdf-extraction-service/` as a
-  *third*, independent Render web service (own `render.yaml` included).
-  Once it's up, copy its URL into the backend's `PDF_SERVICE_URL`. This
-  is optional — everything else works without it, using the lighter
-  `pdf-parse`-based extraction instead.
+This is a monorepo with **one Blueprint** at the repo root (`render.yaml`)
+that defines all three Render-hosted pieces together — the Postgres
+database, the Node backend, and the Python PDF microservice — each
+scoped to its own subfolder via `rootDir`. Render looks for
+`render.yaml` at the repo root by default, so this only works as one
+file, not the three separate ones from earlier iterations of this
+project (if you have those checked out, delete `backend/render.yaml`
+and `pdf-extraction-service/render.yaml` — this repo's root one
+replaces both).
+
+- **Render**: Dashboard → "New" → "Blueprint" → point it at this repo.
+  Render shows a preview of all three resources before creating
+  anything. It provisions the Postgres database, generates
+  `JWT_SECRET`, and auto-wires `PDF_SERVICE_URL` to the PDF
+  microservice's internal address via `fromService` — no manual URL
+  copy-paste needed. After deploy, you still set two secrets yourself
+  in the dashboard (deliberately not committed to the Blueprint):
+  `ANTHROPIC_API_KEY`, and `SUPERADMIN_USERNAME`/`SUPERADMIN_PASSWORD`
+  if you want the platform superadmin bootstrapped.
+- Render suits the backend better than Vercel serverless functions
+  because file processing and multi-step Claude tool loops can run
+  longer than typical serverless timeouts, and it needs a writable
+  disk for uploads/outputs.
+- **Frontend → Vercel**, separately (Blueprints are Render-only, so
+  this isn't in `render.yaml`): push `frontend/` as its own Vercel
+  project and set `VITE_BACKEND_URL` to the backend's Render URL.
+- The PDF microservice is optional — deploying without it just means
+  `extract_pdf_tables` errors with a clear message telling you it
+  isn't configured, and the app falls back to the lighter
+  `pdf-parse`-based extraction for everything else.
 
 ## Known gaps to fill in next (not yet built)
 

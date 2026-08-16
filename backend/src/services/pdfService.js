@@ -1,7 +1,17 @@
 import fs from "fs";
 import pdfParse from "pdf-parse";
 
-const PDF_SERVICE_URL = process.env.PDF_SERVICE_URL; // e.g. https://pdf-extraction-service.onrender.com
+// PDF_SERVICE_URL may come from a Render Blueprint's fromService/hostport
+// wiring, which gives "host:port" with no scheme (that's the internal
+// private-network address, plain HTTP). Normalize so callers can set
+// this either way — a full public HTTPS URL (manual setup) or a bare
+// host:port (Blueprint-wired) both work.
+const RAW_PDF_SERVICE_URL = process.env.PDF_SERVICE_URL;
+const PDF_SERVICE_URL = RAW_PDF_SERVICE_URL
+  ? RAW_PDF_SERVICE_URL.startsWith("http")
+    ? RAW_PDF_SERVICE_URL
+    : `http://${RAW_PDF_SERVICE_URL}`
+  : undefined;
 
 /**
  * Extract raw text from a PDF. Good enough for narrative documents

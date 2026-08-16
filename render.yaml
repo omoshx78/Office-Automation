@@ -1,0 +1,51 @@
+# Render Blueprint for this monorepo. By default Render looks for
+# render.yaml at the repo root — this is that file. It defines all
+# three Render-hosted pieces (Postgres, the Node backend, the Python
+# PDF microservice) together, each scoped to its own subfolder via
+# rootDir. The React frontend is NOT here — it deploys to Vercel
+# separately, since Blueprints are Render-specific.
+#
+# Deploy: in the Render dashboard, "New" -> "Blueprint", point it at
+# this repo. Render will show a preview of everything below before
+# creating anything.
+
+databases:
+  - name: office-automation-db
+    plan: free
+
+services:
+  - type: web
+    name: office-automation-backend
+    runtime: node
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # paste your key in the Render dashboard after deploy
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SUPERADMIN_USERNAME
+        sync: false # leave blank unless you want to bootstrap the platform superadmin
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: office-automation-db
+          property: connectionString
+      - key: PDF_SERVICE_URL
+        fromService:
+          type: web
+          name: pdf-extraction-service
+          property: hostport # internal host:port on Render's private network — see pdfService.js, which prefixes http:// automatically
+      - key: PORT
+        value: 3001
+
+  - type: web
+    name: pdf-extraction-service
+    runtime: python
+    plan: starter
+    rootDir: pdf-extraction-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
