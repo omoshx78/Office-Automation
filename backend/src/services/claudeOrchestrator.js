@@ -1,0 +1,425 @@
+import Anthropic from "@anthropic-ai/sdk";
+import path from "path";
+import * as excelService from "./excelService.js";
+import * as wordService from "./wordService.js";
+import * as pdfService from "./pdfService.js";
+import * as pdfEditService from "./pdfEditService.js";
+import * as emailService from "./emailService.js";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Tool definitions Claude can choose to call. Keep each tool narrow and
+// deterministic — Claude decides WHICH to call and in WHAT order and
+// WHAT arguments to pass (e.g. "which two files", "what column"); the
+// actual file manipulation always happens in the service modules below,
+// never inside the model.
+const tools = [
+  {
+    name: "read_excel",
+    description: "Read an Excel file and return its sheet names and cell data.",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "compute_excel_formulas",
+    description:
+      "Compute formulas in a sheet (VLOOKUP, INDEX/MATCH, SUM, etc.) and return calculated values.",
+    input_schema: {
+      type: "object",
+      properties: {
+        sheets: {
+          type: "object",
+          description: "Map of sheetName -> 2D array of cell values/formulas",
+        },
+      },
+      required: ["sheets"],
+    },
+  },
+  {
+    name: "diff_excel_sheets",
+    description: "Compare two sheets (2D arrays) cell by cell and return the differences.",
+    input_schema: {
+      type: "object",
+      properties: {
+        sheetA: { type: "array" },
+        sheetB: { type: "array" },
+      },
+      required: ["sheetA", "sheetB"],
+    },
+  },
+  {
+    name: "write_excel",
+    description: "Write a 2D array of data/formulas to a new Excel file.",
+    input_schema: {
+      type: "object",
+      properties: {
+        sheetsData: { type: "array" },
+        outPath: { type: "string" },
+        sheetName: { type: "string" },
+      },
+      required: ["sheetsData", "outPath"],
+    },
+  },
+  {
+    name: "fill_excel_template",
+    description:
+      "Clone an existing Excel file's formatting and overwrite specific cells with new values (used to produce a report that copies another report's layout).",
+    input_schema: {
+      type: "object",
+      properties: {
+        templatePath: { type: "string" },
+        outPath: { type: "string" },
+        cellUpdates: { type: "array" },
+      },
+      required: ["templatePath", "outPath", "cellUpdates"],
+    },
+  },
+  {
+    name: "fill_word_template",
+    description: "Fill a Word template's {tags} with data to produce one document.",
+    input_schema: {
+      type: "object",
+      properties: {
+        templatePath: { type: "string" },
+        data: { type: "object" },
+        outPath: { type: "string" },
+      },
+      required: ["templatePath", "data", "outPath"],
+    },
+  },
+  {
+    name: "batch_fill_word_template",
+    description: "Fill a Word template once per row of data, producing multiple documents.",
+    input_schema: {
+      type: "object",
+      properties: {
+        templatePath: { type: "string" },
+        rows: { type: "array" },
+        outDir: { type: "string" },
+      },
+      required: ["templatePath", "rows", "outDir"],
+    },
+  },
+  {
+    name: "extract_pdf_text",
+    description: "Extract raw text from a PDF file.",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "extract_pdf_structured",
+    description:
+      "Best-effort extraction of tabular rows/columns from a PDF using text spacing. " +
+      "Works for simple layouts; prefer extract_pdf_tables for real tables if available.",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "extract_pdf_tables",
+    description:
+      "Extract real tables from a PDF (bordered/ruled or multi-column) via the Python " +
+      "extraction microservice — much more reliable than extract_pdf_structured for complex " +
+      "layouts. Returns tables per page. Only use if this fails saying the service isn't configured.",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "read_eml",
+    description:
+      "Parse a .eml email file: subject, from/to, date, body text, and a list of attachments " +
+      "(saved to disk with a text preview auto-extracted for PDF/Excel attachments where possible).",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "create_email_reply",
+    description:
+      "Build a reply .eml file from a previously-read email (pass the same object read_eml returned) " +
+      "and the reply body text you've composed. Sets Re: subject and threading headers. Does not send anything.",
+    input_schema: {
+      type: "object",
+      properties: {
+        originalParsed: {
+          type: "object",
+          description: "The object returned by a prior read_eml call for this email",
+        },
+        replyBody: { type: "string" },
+        fromAddress: { type: "string" },
+        outPath: { type: "string" },
+      },
+      required: ["originalParsed", "replyBody", "fromAddress", "outPath"],
+    },
+  },
+  {
+    name: "merge_pdfs",
+    description: "Merge multiple PDF files into one, in the given order.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePaths: { type: "array", items: { type: "string" } },
+        outPath: { type: "string" },
+      },
+      required: ["filePaths", "outPath"],
+    },
+  },
+  {
+    name: "split_pdf",
+    description: "Split a PDF into multiple files by 1-indexed inclusive page ranges.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        ranges: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { from: { type: "integer" }, to: { type: "integer" } },
+          },
+        },
+        outDir: { type: "string" },
+      },
+      required: ["filePath", "ranges", "outDir"],
+    },
+  },
+  {
+    name: "delete_pdf_pages",
+    description: "Remove one or more 1-indexed pages from a PDF.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        pagesToRemove: { type: "array", items: { type: "integer" } },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "pagesToRemove", "outPath"],
+    },
+  },
+  {
+    name: "reorder_pdf_pages",
+    description: "Reorder a PDF's pages. newOrder is a list of 1-indexed original page numbers in the desired final order.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        newOrder: { type: "array", items: { type: "integer" } },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "newOrder", "outPath"],
+    },
+  },
+  {
+    name: "rotate_pdf_pages",
+    description: "Rotate specific pages (1-indexed) or all pages by a given angle in degrees (e.g. 90, 180, 270).",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        pageNumbers: {
+          type: "array",
+          items: { type: "integer" },
+          description: "Omit or pass null to rotate every page",
+        },
+        angleDegrees: { type: "integer" },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "angleDegrees", "outPath"],
+    },
+  },
+  {
+    name: "add_pdf_watermark",
+    description: "Stamp a diagonal text watermark across every page of a PDF.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        text: { type: "string" },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "text", "outPath"],
+    },
+  },
+  {
+    name: "add_pdf_page_numbers",
+    description: "Add 'Page X of N' numbering to the bottom of every page.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "outPath"],
+    },
+  },
+  {
+    name: "list_pdf_form_fields",
+    description: "List a PDF's fillable form field names and types, before filling them in.",
+    input_schema: {
+      type: "object",
+      properties: { filePath: { type: "string" } },
+      required: ["filePath"],
+    },
+  },
+  {
+    name: "fill_pdf_form",
+    description: "Fill an existing PDF's form fields by name (text fields and checkboxes) and flatten the result.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        fieldValues: { type: "object" },
+        outPath: { type: "string" },
+      },
+      required: ["filePath", "fieldValues", "outPath"],
+    },
+  },
+];
+
+async function executeTool(name, input, context) {
+  switch (name) {
+    case "read_excel": {
+      const { sheets } = await excelService.loadWorkbook(input.filePath);
+      return sheets;
+    }
+    case "compute_excel_formulas":
+      return excelService.computeValues(input.sheets);
+    case "diff_excel_sheets":
+      return excelService.diffSheets(input.sheetA, input.sheetB);
+    case "write_excel":
+      return excelService.writeWorkbook(input.sheetsData, input.outPath, input.sheetName);
+    case "fill_excel_template":
+      return excelService.fillTemplateWorkbook(input.templatePath, input.outPath, input.cellUpdates);
+    case "fill_word_template":
+      return wordService.fillWordTemplate(input.templatePath, input.data, input.outPath);
+    case "batch_fill_word_template":
+      return wordService.batchFillWordTemplate(input.templatePath, input.rows, input.outDir);
+    case "extract_pdf_text":
+      return pdfService.extractText(input.filePath);
+    case "extract_pdf_structured":
+      return pdfService.extractStructured(input.filePath);
+    case "extract_pdf_tables":
+      return pdfService.extractTables(input.filePath);
+    case "read_eml": {
+      const attachmentsDir = path.join(context.outputDir, "attachments");
+      return emailService.parseEmlFile(input.filePath, attachmentsDir);
+    }
+    case "create_email_reply":
+      return emailService.buildReplyEml(
+        input.originalParsed,
+        input.replyBody,
+        input.fromAddress,
+        input.outPath
+      );
+    case "merge_pdfs":
+      return pdfEditService.mergePdfs(input.filePaths, input.outPath);
+    case "split_pdf":
+      return pdfEditService.splitPdf(input.filePath, input.ranges, input.outDir);
+    case "delete_pdf_pages":
+      return pdfEditService.deletePages(input.filePath, input.pagesToRemove, input.outPath);
+    case "reorder_pdf_pages":
+      return pdfEditService.reorderPages(input.filePath, input.newOrder, input.outPath);
+    case "rotate_pdf_pages":
+      return pdfEditService.rotatePages(
+        input.filePath,
+        input.pageNumbers ?? null,
+        input.angleDegrees,
+        input.outPath
+      );
+    case "add_pdf_watermark":
+      return pdfEditService.addWatermark(input.filePath, input.text, input.outPath);
+    case "add_pdf_page_numbers":
+      return pdfEditService.addPageNumbers(input.filePath, input.outPath);
+    case "list_pdf_form_fields":
+      return pdfEditService.listFormFields(input.filePath);
+    case "fill_pdf_form":
+      return pdfEditService.fillForm(input.filePath, input.fieldValues, input.outPath);
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+/**
+ * Run a natural-language command through Claude with tool use.
+ * Claude decides which tools to call (possibly several, in sequence)
+ * to satisfy the command, we execute each one against the real files,
+ * and feed results back until Claude produces a final text answer.
+ */
+export async function runCommand(userCommand, context = {}) {
+  const messages = [
+    {
+      role: "user",
+      content: `${userCommand}\n\nAvailable file paths / context: ${JSON.stringify(context)}`,
+    },
+  ];
+
+  const MAX_TURNS = 8;
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 4096,
+      system:
+        "You are an office automation assistant. You have tools to read/write Excel, " +
+        "fill Word templates, extract PDF data (prefer extract_pdf_tables for real tables when " +
+        "it's configured; fall back to extract_pdf_structured or extract_pdf_text if it errors " +
+        "saying the service isn't set up), and read .eml emails (including their " +
+        "attachments) and draft replies. When asked to summarize an email, call read_eml first " +
+        "and base the summary on bodyText plus any attachment previews, then write the summary " +
+        "as your final text response (no file needed) unless the user asked for a saved summary. " +
+        "When asked to draft/create a response to an email, call read_eml first if you haven't " +
+        "already, compose the reply text yourself based on the email's content and the user's " +
+        "instructions, then call create_email_reply with that exact object and text to produce " +
+        "the .eml file. This tool only ever saves a draft file — there is no way to send email " +
+        "in this system, by design. Never imply to the user that a reply was sent; always say " +
+        "it was saved as a draft for them to review and send themselves. You can also edit PDFs " +
+        "directly: merge, split, delete/reorder/rotate pages, add a text watermark, add page " +
+        "numbers, and fill/flatten PDF form fields (list_pdf_form_fields first to see what's " +
+        "available). PDF editing can't rewrite existing body text in place — that's a structural " +
+        "limitation of the format, not a missing feature; say so if asked to do that. " +
+        "Always explain what you did in plain language in your final response.",
+      tools,
+      messages,
+    });
+
+    const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
+
+    if (toolUseBlocks.length === 0) {
+      // Claude produced a final answer, no more tools to call
+      const text = response.content.find((b) => b.type === "text");
+      return { done: true, text: text?.text ?? "" };
+    }
+
+    messages.push({ role: "assistant", content: response.content });
+
+    const toolResults = [];
+    for (const block of toolUseBlocks) {
+      let result;
+      try {
+        result = await executeTool(block.name, block.input, context);
+      } catch (err) {
+        result = { error: err.message };
+      }
+      toolResults.push({
+        type: "tool_result",
+        tool_use_id: block.id,
+        content: JSON.stringify(result),
+      });
+    }
+    messages.push({ role: "user", content: toolResults });
+  }
+
+  return { done: false, text: "Reached max turns without a final answer." };
+}
