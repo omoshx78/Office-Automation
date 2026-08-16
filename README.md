@@ -200,6 +200,15 @@ replaces both).
   isn't configured, and the app falls back to the lighter
   `pdf-parse`-based extraction for everything else.
 
+**Free-tier trade-offs worth knowing before you rely on it:**
+- Free web services spin down after 15 minutes of no traffic — the
+  first request after that takes 30-60 seconds to wake back up. Fine
+  for testing/low-traffic use, not great for something people expect
+  to respond instantly.
+- Render's free Postgres databases expire after 90 days unless
+  upgraded to a paid instance — this one holds your user accounts, so
+  put a reminder somewhere before that deadline hits.
+
 ## Known gaps to fill in next (not yet built)
 
 - File persistence: uploads/outputs currently live on local disk —
