@@ -263,7 +263,22 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 const PORT = process.env.PORT || 3001;
 
 initDb()
-  .then(() => authService.ensureSuperadminFromEnv())
+  .then(async () => {
+    // A misconfigured SUPERADMIN_USERNAME/PASSWORD (bad format, too
+    // short, etc.) is a validation problem with that one optional
+    // feature — it must never take down the whole app and lock every
+    // organization out. Log it clearly and keep starting up; only a
+    // genuine database/connection failure below is fatal.
+    try {
+      await authService.ensureSuperadminFromEnv();
+    } catch (err) {
+      console.error(
+        "Superadmin bootstrap skipped due to a configuration error " +
+          "(app is starting normally without it):",
+        err.message
+      );
+    }
+  })
   .then(() => {
     app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
   })

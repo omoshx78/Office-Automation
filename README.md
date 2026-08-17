@@ -84,6 +84,11 @@ that org able to help. It cannot see any organization's files or data
   exist. Deliberately not an HTTP-creatable role — creating a platform
   superuser should require deploy-level access, not just an
   authenticated API call.
+- `SUPERADMIN_USERNAME` follows the same rule as every other username:
+  3-32 characters, letters/numbers/`_`/`.`/`-` only — **no `@`, so
+  don't use an email address**. `SUPERADMIN_PASSWORD` needs 8+
+  characters. Getting either wrong doesn't crash the app (see below);
+  it just skips bootstrapping and logs why.
 - Logs in through the same `POST /api/auth/login` as everyone else
   (username + password) — the frontend just routes them straight to a
   **Platform** tab (`SuperadminPanel.jsx`) instead of the normal
@@ -96,6 +101,12 @@ that org able to help. It cannot see any organization's files or data
   need more than one person to have break-glass access, the current
   setup doesn't support that without changing `ensureSuperadminFromEnv`
   — flagging that rather than pretending it's already handled.
+- A misconfigured `SUPERADMIN_USERNAME`/`PASSWORD` (bad format, too
+  short) is caught during startup and logged as a warning — the app
+  still starts normally without the superadmin account, rather than
+  crashing and taking every organization's access down with it. Check
+  the deploy logs for "Superadmin bootstrap skipped" if you expect the
+  account to exist and it doesn't.
 
 ## Coverage of your requirements
 
