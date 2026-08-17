@@ -115,7 +115,10 @@ that org able to help. It cannot see any organization's files or data
   dedicated `/api/compare-excel` endpoint and a **Compare Excel** tab
   in the frontend (`frontend/src/components/DiffView.jsx`) showing
   both sheets side-by-side with differing cells highlighted — not just
-  Claude's text summary.
+  Claude's text summary. This tab uploads its own two files directly
+  (like Batch templates does) rather than depending on files uploaded
+  elsewhere — each tab is self-contained, so you don't have to visit
+  Command first for the other tabs to have anything to work with.
 - **Analyze / report from raw data copying another report's format** →
   `fill_excel_template` (clones formatting, injects new values) or
   `buildWordDoc`/`fillWordTemplate` for narrative reports

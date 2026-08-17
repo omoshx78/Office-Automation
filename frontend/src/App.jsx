@@ -172,7 +172,7 @@ export default function App() {
           ))}
         </div>
 
-        {tab === "diff" && <DiffView backendUrl={BACKEND_URL} token={token} uploadedFiles={uploaded} />}
+        {tab === "diff" && <DiffView backendUrl={BACKEND_URL} token={token} />}
         {tab === "batch" && <BatchTemplateFlow backendUrl={BACKEND_URL} token={token} />}
         {tab === "admin" && user?.role === "admin" && <AdminPanel backendUrl={BACKEND_URL} token={token} />}
         {tab === "platform" && user?.role === "superadmin" && (
