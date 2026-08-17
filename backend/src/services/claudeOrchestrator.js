@@ -497,36 +497,66 @@ export async function runCommand(userCommand, context = {}) {
 
   const MAX_TURNS = 8;
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 4096,
-      system:
-        "You are an office automation assistant. You have tools to read/write Excel, " +
-        "fill Word templates, extract PDF data (prefer extract_pdf_tables for real tables when " +
-        "it's configured; fall back to extract_pdf_structured or extract_pdf_text if it errors " +
-        "saying the service isn't set up), and read .eml emails (including their " +
-        "attachments) and draft replies. When asked to summarize an email, call read_eml first " +
-        "and base the summary on bodyText plus any attachment previews, then write the summary " +
-        "as your final text response (no file needed) unless the user asked for a saved summary. " +
-        "When asked to draft/create a response to an email, call read_eml first if you haven't " +
-        "already, compose the reply text yourself based on the email's content and the user's " +
-        "instructions, then call create_email_reply with that exact object and text to produce " +
-        "the .eml file. This tool only ever saves a draft file — there is no way to send email " +
-        "in this system, by design. Never imply to the user that a reply was sent; always say " +
-        "it was saved as a draft for them to review and send themselves. You can also edit PDFs " +
-        "directly: merge, split, delete/reorder/rotate pages, add a text watermark, add page " +
-        "numbers, and fill/flatten PDF form fields (list_pdf_form_fields first to see what's " +
-        "available). PDF editing can't rewrite existing body text in place — that's a structural " +
-        "limitation of the format, not a missing feature; say so if asked to do that. " +
-        "You can also build PowerPoint decks (create_presentation) with native, editable charts " +
-        "and a custom color theme, and add charts to Word/Excel via render_chart_image plus " +
-        "build_word_document or insert_excel_image — those are static images, not editable " +
-        "afterward, unlike PowerPoint's native charts; mention that distinction if it's relevant " +
-        "to what the user asked for. " +
-        "Always explain what you did in plain language in your final response.",
-      tools,
-      messages,
-    });
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 4096,
+        system:
+          "You are an office automation assistant. You have tools to read/write Excel, " +
+          "fill Word templates, extract PDF data (prefer extract_pdf_tables for real tables when " +
+          "it's configured; fall back to extract_pdf_structured or extract_pdf_text if it errors " +
+          "saying the service isn't set up), and read .eml emails (including their " +
+          "attachments) and draft replies. When asked to summarize an email, call read_eml first " +
+          "and base the summary on bodyText plus any attachment previews, then write the summary " +
+          "as your final text response (no file needed) unless the user asked for a saved summary. " +
+          "When asked to draft/create a response to an email, call read_eml first if you haven't " +
+          "already, compose the reply text yourself based on the email's content and the user's " +
+          "instructions, then call create_email_reply with that exact object and text to produce " +
+          "the .eml file. This tool only ever saves a draft file — there is no way to send email " +
+          "in this system, by design. Never imply to the user that a reply was sent; always say " +
+          "it was saved as a draft for them to review and send themselves. You can also edit PDFs " +
+          "directly: merge, split, delete/reorder/rotate pages, add a text watermark, add page " +
+          "numbers, and fill/flatten PDF form fields (list_pdf_form_fields first to see what's " +
+          "available). PDF editing can't rewrite existing body text in place — that's a structural " +
+          "limitation of the format, not a missing feature; say so if asked to do that. " +
+          "You can also build PowerPoint decks (create_presentation) with native, editable charts " +
+          "and a custom color theme, and add charts to Word/Excel via render_chart_image plus " +
+          "build_word_document or insert_excel_image — those are static images, not editable " +
+          "afterward, unlike PowerPoint's native charts; mention that distinction if it's relevant " +
+          "to what the user asked for. " +
+          "Always explain what you did in plain language in your final response.",
+        tools,
+        messages,
+      });
+    } catch (err) {
+      // Log full detail server-side (Render logs), but never surface a
+      // raw API error body to whoever's typing a command — especially
+      // in a multi-tenant app, that's internal operational detail, not
+      // something a business user should see on their screen.
+      console.error("Anthropic API call failed:", err);
+
+      if (err.status === 401) {
+        throw new Error(
+          "The AI service isn't configured correctly (invalid or missing API key). " +
+            "This needs to be fixed by an administrator, not something you can resolve here."
+        );
+      }
+      if (err.status === 400 && /credit balance/i.test(err.message || "")) {
+        throw new Error(
+          "The organization's AI service has run out of credits. " +
+            "This needs to be resolved by an administrator adding funds to the Anthropic account — " +
+            "it isn't something you can fix from here."
+        );
+      }
+      if (err.status === 429) {
+        throw new Error("The AI service is temporarily rate-limited or over quota. Try again shortly.");
+      }
+      if (err.status >= 500) {
+        throw new Error("The AI service is temporarily unavailable. Try again in a moment.");
+      }
+      throw new Error("Something went wrong processing that command. Please try again.");
+    }
 
     const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
 
