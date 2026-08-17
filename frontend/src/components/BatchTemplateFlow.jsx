@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { colors, fonts, buttonPrimary, buttonSecondary, card } from "../theme.js";
 
 export default function BatchTemplateFlow({ backendUrl, token }) {
   const [templateFile, setTemplateFile] = useState(null);
@@ -65,8 +66,10 @@ export default function BatchTemplateFlow({ backendUrl, token }) {
   }
 
   return (
-    <div>
-      <h3>Batch generate documents/emails from a template</h3>
+    <div style={{ ...card, padding: 24 }}>
+      <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 600, color: colors.navy, margin: "0 0 6px" }}>
+        Batch generate documents/emails from a template
+      </h3>
       <p style={{ fontSize: 13, color: "#555" }}>
         Upload a Word template with placeholders like <code>{"{name}"}</code>,{" "}
         <code>{"{amount}"}</code>, etc., and an Excel file whose first row headers match those
@@ -114,7 +117,7 @@ export default function BatchTemplateFlow({ backendUrl, token }) {
         />
       </div>
 
-      <button onClick={runBatch} disabled={loading || !templatePath || !dataPath}>
+      <button onClick={runBatch} disabled={loading || !templatePath || !dataPath} style={{ ...buttonPrimary, opacity: loading || !templatePath || !dataPath ? 0.6 : 1 }}>
         {loading ? "Generating..." : "Generate batch"}
       </button>
 
@@ -130,7 +133,7 @@ export default function BatchTemplateFlow({ backendUrl, token }) {
               <li key={f}>{f}</li>
             ))}
           </ul>
-          <button onClick={downloadZip}>Download all as .zip</button>
+          <button onClick={downloadZip} style={buttonSecondary}>Download all as .zip</button>
         </div>
       )}
     </div>

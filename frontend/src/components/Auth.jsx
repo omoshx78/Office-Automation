@@ -1,4 +1,6 @@
 import { useState } from "react";
+import SkylineArt from "./SkylineArt.jsx";
+import { colors, fonts, buttonPrimary, input as inputStyle } from "../theme.js";
 
 export default function Auth({ backendUrl, onAuthenticated }) {
   const [mode, setMode] = useState("login"); // "login" | "create-org"
@@ -33,92 +35,214 @@ export default function Auth({ backendUrl, onAuthenticated }) {
   }
 
   return (
-    <div style={{ maxWidth: 380, margin: "80px auto", fontFamily: "sans-serif" }}>
-      <h2>{mode === "login" ? "Log in" : "Create your organization"}</h2>
-      {mode === "create-org" && (
-        <p style={{ fontSize: 13, color: "#555" }}>
-          This creates a new organization and makes you its admin. You can then add
-          teammates from the Admin panel — there's no separate public signup.
-        </p>
-      )}
-
-      <form onSubmit={submit}>
-        {mode === "create-org" && (
-          <div style={{ marginBottom: 12 }}>
-            <label>Organization name</label>
-            <br />
-            <input
-              type="text"
-              required
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              style={{ width: "100%", padding: 6 }}
-            />
+    <div style={{ minHeight: "100vh", display: "flex", flexWrap: "wrap" }}>
+      {/* Hero side */}
+      <div
+        style={{
+          position: "relative",
+          flex: "1 1 480px",
+          minHeight: 320,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "flex-end",
+        }}
+      >
+        <SkylineArt style={{ position: "absolute", inset: 0 }} />
+        <div style={{ position: "relative", padding: "48px 48px 56px", color: colors.white, maxWidth: 480 }}>
+          <div
+            style={{
+              fontFamily: fonts.body,
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: colors.sky,
+              marginBottom: 12,
+            }}
+          >
+            Office Automation
           </div>
-        )}
-        <div style={{ marginBottom: 12 }}>
-          <label>Username</label>
-          <br />
-          <input
-            type="text"
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="letters, numbers, _ . - only"
-            style={{ width: "100%", padding: 6 }}
-          />
+          <h1
+            style={{
+              fontFamily: fonts.display,
+              fontSize: "clamp(28px, 4vw, 42px)",
+              fontWeight: 600,
+              lineHeight: 1.15,
+              margin: "0 0 16px",
+            }}
+          >
+            Run your office.
+            <br />
+            Skip the busywork.
+          </h1>
+          <p style={{ fontFamily: fonts.body, fontSize: 15, lineHeight: 1.6, color: "#D7EAF7", margin: 0 }}>
+            Compare spreadsheets, generate reports, draft documents, and build
+            presentations — all from one place, for your whole team.
+          </p>
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>Password {mode === "create-org" && "(min 8 characters)"}</label>
-          <br />
-          <input
-            type="password"
-            required
-            minLength={mode === "create-org" ? 8 : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", padding: 6 }}
-          />
-        </div>
-        {error && <p style={{ color: "crimson", fontSize: 13 }}>{error}</p>}
-        <button type="submit" disabled={loading} style={{ width: "100%", padding: 8 }}>
-          {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create organization"}
-        </button>
-      </form>
+      </div>
 
-      <p style={{ fontSize: 13, marginTop: 16 }}>
-        {mode === "login" ? (
-          <>
-            Starting fresh?{" "}
+      {/* Form side */}
+      <div
+        style={{
+          flex: "1 1 380px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 32,
+          background: colors.skyPale,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 380,
+            background: colors.white,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 16,
+            boxShadow: "0 8px 30px rgba(10, 46, 77, 0.10)",
+            padding: 36,
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: fonts.display,
+              fontSize: 26,
+              fontWeight: 600,
+              color: colors.navy,
+              margin: "0 0 8px",
+            }}
+          >
+            {mode === "login" ? "Welcome back" : "Create your organization"}
+          </h2>
+          {mode === "create-org" && (
+            <p style={{ fontFamily: fonts.body, fontSize: 13, color: colors.slateMuted, marginTop: 0 }}>
+              This creates a new organization and makes you its admin. You can then add
+              teammates from the Admin panel — there's no separate public signup.
+            </p>
+          )}
+
+          <form onSubmit={submit} style={{ marginTop: 20 }}>
+            {mode === "create-org" && (
+              <Field label="Organization name">
+                <input
+                  type="text"
+                  required
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  style={inputStyle}
+                />
+              </Field>
+            )}
+            <Field label="Username">
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="letters, numbers, _ . - only"
+                style={inputStyle}
+              />
+            </Field>
+            <Field label={mode === "create-org" ? "Password (min 8 characters)" : "Password"}>
+              <input
+                type="password"
+                required
+                minLength={mode === "create-org" ? 8 : undefined}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+
+            {error && (
+              <p style={{ fontFamily: fonts.body, color: colors.danger, fontSize: 13, marginTop: -4 }}>
+                {error}
+              </p>
+            )}
+
             <button
-              onClick={() => {
-                setMode("create-org");
-                setError(null);
-              }}
-              style={{ background: "none", border: "none", color: "#0066cc", cursor: "pointer", padding: 0 }}
+              type="submit"
+              disabled={loading}
+              style={{ ...buttonPrimary, width: "100%", padding: "12px 20px", marginTop: 8, opacity: loading ? 0.7 : 1 }}
             >
-              Create a new organization
+              {loading ? "Please wait..." : mode === "login" ? "Log in" : "Create organization"}
             </button>
-          </>
-        ) : (
-          <>
-            Already have an account?{" "}
-            <button
-              onClick={() => {
-                setMode("login");
-                setError(null);
-              }}
-              style={{ background: "none", border: "none", color: "#0066cc", cursor: "pointer", padding: 0 }}
-            >
-              Log in
-            </button>
-          </>
-        )}
-      </p>
-      <p style={{ fontSize: 12, color: "#888", marginTop: 8 }}>
-        If your admin created your account for you, use the username and password they
-        gave you and log in directly — no need to create a new organization.
-      </p>
+          </form>
+
+          <p style={{ fontFamily: fonts.body, fontSize: 13, marginTop: 20, color: colors.slateMuted }}>
+            {mode === "login" ? (
+              <>
+                Starting fresh?{" "}
+                <LinkButton
+                  onClick={() => {
+                    setMode("create-org");
+                    setError(null);
+                  }}
+                >
+                  Create a new organization
+                </LinkButton>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <LinkButton
+                  onClick={() => {
+                    setMode("login");
+                    setError(null);
+                  }}
+                >
+                  Log in
+                </LinkButton>
+              </>
+            )}
+          </p>
+          <p style={{ fontFamily: fonts.body, fontSize: 12, color: "#93A3B3", marginTop: 4 }}>
+            If your admin created your account for you, log in directly with the
+            username and password they gave you.
+          </p>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label
+        style={{
+          display: "block",
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 13,
+          fontWeight: 600,
+          color: colors.navy,
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function LinkButton({ onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: "none",
+        border: "none",
+        color: colors.skyDark,
+        fontWeight: 600,
+        cursor: "pointer",
+        padding: 0,
+        fontSize: 13,
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {children}
+    </button>
   );
 }

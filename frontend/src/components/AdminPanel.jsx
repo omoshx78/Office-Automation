@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { colors, fonts, buttonPrimary, buttonSecondary, card, input as inputStyle } from "../theme.js";
 
 export default function AdminPanel({ backendUrl, token }) {
   const [users, setUsers] = useState([]);
@@ -78,21 +79,23 @@ export default function AdminPanel({ backendUrl, token }) {
   }
 
   return (
-    <div>
-      <h3>Organization users</h3>
-      <p style={{ fontSize: 13, color: "#555" }}>
+    <div style={{ ...card, padding: 24 }}>
+      <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 600, color: colors.navy, margin: "0 0 6px" }}>
+        Organization users
+      </h3>
+      <p style={{ fontSize: 13, color: colors.slateMuted, marginTop: 0 }}>
         Give teammates their username and password directly — there's no email step.
         You can reset a forgotten password here at any time.
       </p>
 
-      <form onSubmit={createUser} style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 20 }}>
+      <form onSubmit={createUser} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap" }}>
         <div>
-          <label style={{ fontSize: 12 }}>Username</label>
+          <label style={{ fontSize: 12, color: colors.navy, fontWeight: 600 }}>Username</label>
           <br />
-          <input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required />
+          <input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required style={inputStyle} />
         </div>
         <div>
-          <label style={{ fontSize: 12 }}>Initial password</label>
+          <label style={{ fontSize: 12, color: colors.navy, fontWeight: 600 }}>Initial password</label>
           <br />
           <input
             type="password"
@@ -100,43 +103,44 @@ export default function AdminPanel({ backendUrl, token }) {
             onChange={(e) => setNewPassword(e.target.value)}
             minLength={8}
             required
+            style={inputStyle}
           />
         </div>
         <div>
-          <label style={{ fontSize: 12 }}>Role</label>
+          <label style={{ fontSize: 12, color: colors.navy, fontWeight: 600 }}>Role</label>
           <br />
-          <select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+          <select value={newRole} onChange={(e) => setNewRole(e.target.value)} style={{ ...inputStyle, padding: "9px 10px" }}>
             <option value="member">Member</option>
             <option value="admin">Admin</option>
           </select>
         </div>
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} style={buttonPrimary}>
           {loading ? "Adding..." : "Add user"}
         </button>
       </form>
 
-      {error && <p style={{ color: "crimson", fontSize: 13 }}>{error}</p>}
+      {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
 
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
         <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-            <th style={{ padding: 6 }}>Username</th>
-            <th style={{ padding: 6 }}>Role</th>
-            <th style={{ padding: 6 }}>Joined</th>
-            <th style={{ padding: 6 }}></th>
+          <tr style={{ textAlign: "left", borderBottom: `2px solid ${colors.navy}` }}>
+            <th style={{ padding: 8, color: colors.navy }}>Username</th>
+            <th style={{ padding: 8, color: colors.navy }}>Role</th>
+            <th style={{ padding: 8, color: colors.navy }}>Joined</th>
+            <th style={{ padding: 8 }}></th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-              <td style={{ padding: 6 }}>{u.username}</td>
-              <td style={{ padding: 6 }}>{u.role}</td>
-              <td style={{ padding: 6 }}>{new Date(u.created_at).toLocaleDateString()}</td>
-              <td style={{ padding: 6 }}>
-                <button onClick={() => setResetTarget(u)} style={{ marginRight: 8, fontSize: 12 }}>
+            <tr key={u.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+              <td style={{ padding: 8 }}>{u.username}</td>
+              <td style={{ padding: 8 }}>{u.role}</td>
+              <td style={{ padding: 8 }}>{new Date(u.created_at).toLocaleDateString()}</td>
+              <td style={{ padding: 8 }}>
+                <button onClick={() => setResetTarget(u)} style={{ ...buttonSecondary, padding: "5px 12px", fontSize: 12, marginRight: 8 }}>
                   Reset password
                 </button>
-                <button onClick={() => deleteUser(u.id)} style={{ fontSize: 12 }}>
+                <button onClick={() => deleteUser(u.id)} style={{ ...buttonSecondary, padding: "5px 12px", fontSize: 12, color: colors.danger, borderColor: colors.danger }}>
                   Remove
                 </button>
               </td>
@@ -149,14 +153,15 @@ export default function AdminPanel({ backendUrl, token }) {
         <div
           style={{
             marginTop: 16,
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 4,
+            padding: 16,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
             maxWidth: 320,
+            background: colors.skyPale,
           }}
         >
           <form onSubmit={submitResetPassword}>
-            <p style={{ margin: "0 0 8px" }}>
+            <p style={{ margin: "0 0 8px", fontSize: 14 }}>
               Reset password for <strong>{resetTarget.username}</strong>
             </p>
             <input
@@ -166,16 +171,16 @@ export default function AdminPanel({ backendUrl, token }) {
               onChange={(e) => setResetPassword(e.target.value)}
               minLength={8}
               required
-              style={{ width: "100%", padding: 6, marginBottom: 8 }}
+              style={{ ...inputStyle, marginBottom: 10 }}
             />
-            <button type="submit">Set new password</button>
+            <button type="submit" style={buttonPrimary}>Set new password</button>
             <button
               type="button"
               onClick={() => {
                 setResetTarget(null);
                 setResetPassword("");
               }}
-              style={{ marginLeft: 8 }}
+              style={{ ...buttonSecondary, marginLeft: 8 }}
             >
               Cancel
             </button>

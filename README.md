@@ -186,6 +186,22 @@ packages via a Dockerfile-based deploy instead of the default Node
 buildpack. PowerPoint generation and every other feature in this app
 has no such dependency and is unaffected either way.
 
+## Design
+
+Navy/sky-blue corporate palette (`frontend/src/theme.js` — colors,
+fonts, and reusable style fragments, imported by every component
+rather than hardcoded per-file). `Fraunces` (serif, for headlines) is
+paired with `Inter` (for everything functional — tables, forms,
+buttons) via `frontend/src/index.css`.
+
+The login/create-organization screen (`Auth.jsx`) uses an **original
+illustrated skyline + collaboration-network graphic**
+(`components/SkylineArt.jsx`, hand-built inline SVG) rather than a
+stock photograph — deliberately, to avoid stock-photo licensing
+questions and a hotlinked external image that could break or get
+blocked. It renders instantly, works offline in dev, and needs no
+external asset hosting.
+
 ## Local setup
 
 Requires a local Postgres (or a free hosted one, e.g. via `docker run

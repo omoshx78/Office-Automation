@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { colors, fonts, buttonPrimary, buttonSecondary, card, input as inputStyle } from "../theme.js";
 
 export default function SuperadminPanel({ backendUrl, token }) {
   const [orgs, setOrgs] = useState([]);
@@ -42,29 +43,31 @@ export default function SuperadminPanel({ backendUrl, token }) {
   }
 
   return (
-    <div>
-      <h3>Platform admin</h3>
-      <p style={{ fontSize: 13, color: "#555" }}>
+    <div style={{ ...card, padding: 24 }}>
+      <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 600, color: colors.navy, margin: "0 0 6px" }}>
+        Platform admin
+      </h3>
+      <p style={{ fontSize: 13, color: colors.slateMuted, marginTop: 0 }}>
         Break-glass access only — you can see organization/admin names and reset a
         password, but nothing about what's inside any organization's files or data.
       </p>
 
-      {error && <p style={{ color: "crimson", fontSize: 13 }}>{error}</p>}
+      {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
 
       {orgs.map((org) => (
-        <div key={org.id} style={{ marginBottom: 20, border: "1px solid #eee", borderRadius: 4, padding: 12 }}>
-          <strong>{org.name}</strong>{" "}
-          <span style={{ fontSize: 12, color: "#888" }}>
+        <div key={org.id} style={{ marginBottom: 20, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16 }}>
+          <strong style={{ color: colors.navy }}>{org.name}</strong>{" "}
+          <span style={{ fontSize: 12, color: colors.slateMuted }}>
             created {new Date(org.createdAt).toLocaleDateString()}
           </span>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13, marginTop: 8 }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13, marginTop: 10 }}>
             <tbody>
               {org.users.map((u) => (
-                <tr key={u.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                  <td style={{ padding: 4 }}>{u.username}</td>
-                  <td style={{ padding: 4 }}>{u.role}</td>
-                  <td style={{ padding: 4 }}>
-                    <button onClick={() => setResetTarget(u)} style={{ fontSize: 12 }}>
+                <tr key={u.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <td style={{ padding: 6 }}>{u.username}</td>
+                  <td style={{ padding: 6 }}>{u.role}</td>
+                  <td style={{ padding: 6 }}>
+                    <button onClick={() => setResetTarget(u)} style={{ ...buttonSecondary, padding: "5px 12px", fontSize: 12 }}>
                       Reset password
                     </button>
                   </td>
@@ -79,14 +82,15 @@ export default function SuperadminPanel({ backendUrl, token }) {
         <div
           style={{
             marginTop: 16,
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 4,
+            padding: 16,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
             maxWidth: 320,
+            background: colors.skyPale,
           }}
         >
           <form onSubmit={submitResetPassword}>
-            <p style={{ margin: "0 0 8px" }}>
+            <p style={{ margin: "0 0 8px", fontSize: 14 }}>
               Reset password for <strong>{resetTarget.username}</strong>
             </p>
             <input
@@ -96,16 +100,16 @@ export default function SuperadminPanel({ backendUrl, token }) {
               onChange={(e) => setResetPassword(e.target.value)}
               minLength={8}
               required
-              style={{ width: "100%", padding: 6, marginBottom: 8 }}
+              style={{ ...inputStyle, marginBottom: 10 }}
             />
-            <button type="submit">Set new password</button>
+            <button type="submit" style={buttonPrimary}>Set new password</button>
             <button
               type="button"
               onClick={() => {
                 setResetTarget(null);
                 setResetPassword("");
               }}
-              style={{ marginLeft: 8 }}
+              style={{ ...buttonSecondary, marginLeft: 8 }}
             >
               Cancel
             </button>

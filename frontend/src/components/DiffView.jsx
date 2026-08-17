@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { colors, fonts, buttonPrimary, card } from "../theme.js";
 
 export default function DiffView({ backendUrl, token, uploadedFiles }) {
   const [pathA, setPathA] = useState("");
@@ -56,7 +57,7 @@ export default function DiffView({ backendUrl, token, uploadedFiles }) {
                       style={{
                         border: "1px solid #ddd",
                         padding: "4px 8px",
-                        background: isDiff ? "#ffe9a8" : "transparent",
+                        background: isDiff ? "#FCE9C2" : "transparent",
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -73,8 +74,10 @@ export default function DiffView({ backendUrl, token, uploadedFiles }) {
   }
 
   return (
-    <div>
-      <h3>Compare Excel sheets</h3>
+    <div style={{ ...card, padding: 24 }}>
+      <h3 style={{ fontFamily: fonts.display, fontSize: 18, fontWeight: 600, color: colors.navy, margin: "0 0 16px" }}>
+        Compare Excel sheets
+      </h3>
 
       <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
         <div>
@@ -124,7 +127,7 @@ export default function DiffView({ backendUrl, token, uploadedFiles }) {
         </div>
       </div>
 
-      <button onClick={runCompare} disabled={loading || !pathA || !pathB}>
+      <button onClick={runCompare} disabled={loading || !pathA || !pathB} style={{ ...buttonPrimary, opacity: loading || !pathA || !pathB ? 0.6 : 1 }}>
         {loading ? "Comparing..." : "Compare"}
       </button>
 
