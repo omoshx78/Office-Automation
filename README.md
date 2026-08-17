@@ -204,8 +204,14 @@ replaces both).
   longer than typical serverless timeouts, and it needs a writable
   disk for uploads/outputs.
 - **Frontend → Vercel**, separately (Blueprints are Render-only, so
-  this isn't in `render.yaml`): push `frontend/` as its own Vercel
-  project and set `VITE_BACKEND_URL` to the backend's Render URL.
+  this isn't in `render.yaml`): set Root Directory to `frontend`, and
+  set `VITE_BACKEND_URL` to the backend's Render URL. Once you know
+  your Vercel URL, add it to the backend's `ALLOWED_ORIGINS` on
+  Render (comma-separated if you have more than one, e.g. a custom
+  domain) — the backend rejects requests from origins not on that
+  list, except `*.vercel.app` preview URLs, which are always allowed
+  automatically so per-branch previews keep working without updating
+  this list for every one.
 - The PDF microservice is optional — deploying without it just means
   `extract_pdf_tables` errors with a clear message telling you it
   isn't configured, and the app falls back to the lighter

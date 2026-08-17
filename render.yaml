@@ -24,6 +24,8 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false # paste your key in the Render dashboard after deploy
+      - key: ALLOWED_ORIGINS
+        sync: false # comma-separated, e.g. https://your-app.vercel.app — *.vercel.app previews are always allowed automatically
       - key: JWT_SECRET
         generateValue: true
       - key: SUPERADMIN_USERNAME

@@ -19,7 +19,35 @@ const UPLOAD_ROOT = path.join(__dirname, "..", "uploads");
 const OUTPUT_ROOT = path.join(__dirname, "..", "outputs");
 
 const app = express();
-app.use(cors());
+
+// Restrict cross-origin requests to known frontend URL(s) instead of
+// allowing any origin. ALLOWED_ORIGINS is a comma-separated list —
+// set it to your production Vercel URL, and add any others you need
+// (e.g. a custom domain, localhost for local dev). *.vercel.app is
+// allowed automatically so Vercel's per-branch preview deployments
+// keep working without listing every preview URL by hand.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // No Origin header (curl, server-to-server, some health checks)
+      // — allow it; there's no browser same-origin policy to enforce.
+      if (!origin) return callback(null, true);
+
+      const isExplicitlyAllowed = allowedOrigins.includes(origin);
+      const isVercelPreview = /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin);
+
+      if (isExplicitlyAllowed || isVercelPreview) {
+        return callback(null, true);
+      }
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+  })
+);
 app.use(express.json({ limit: "20mb" }));
 
 // Per-user directories. Every authenticated request scopes its file
