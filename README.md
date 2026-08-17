@@ -159,6 +159,32 @@ that org able to help. It cannot see any organization's files or data
   what's fillable). What it deliberately can't do: rewrite existing
   body text in place — PDFs don't store text as editable paragraphs,
   so that's a format limitation, not a gap in the tool.
+- **PowerPoint generation** → `pptxService.js` (via `pptxgenjs`),
+  exposed through the command box as `create_presentation`. Builds
+  real `.pptx` decks: title/bullet/image/table/chart slides, a
+  configurable color theme, custom fonts. Charts on slides are
+  **native, editable PowerPoint chart objects** — double-click one in
+  PowerPoint afterward and its data/type/colors can be adjusted
+  normally, the same as a chart built by hand.
+- **Data visualization in Excel/Word reports** → `chartService.js`
+  (via `chartjs-node-canvas`) renders a chart to a PNG image
+  (`render_chart_image`), which `build_word_document` or
+  `insert_excel_image` then embeds. **Important trade-off**: unlike
+  the PowerPoint charts above, these are *static images*, not
+  editable after the fact — Node's Word/Excel libraries don't have a
+  good native chart-authoring API, so an image is the reliable path.
+  If someone needs to tweak the chart afterward inside Excel/Word
+  itself, that's a real limitation worth surfacing to them, not
+  something to gloss over.
+
+**A deployment note on chart rendering**: `chartjs-node-canvas`
+depends on the `canvas` package, which needs native system graphics
+libraries (Cairo, etc.), not just `npm install`. This generally builds
+fine on Render, but if a deploy fails specifically on installing
+`canvas`, that's the cause — the fix is adding the relevant system
+packages via a Dockerfile-based deploy instead of the default Node
+buildpack. PowerPoint generation and every other feature in this app
+has no such dependency and is unaffected either way.
 
 ## Local setup
 

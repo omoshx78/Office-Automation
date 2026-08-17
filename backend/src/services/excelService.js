@@ -103,6 +103,51 @@ export function sheetToObjects(sheet) {
     });
 }
 /**
+ * Embed a PNG image (typically a chart rendered by
+ * chartService.renderChartImage) into a sheet of an existing workbook,
+ * anchored at a given cell (e.g. "E2"). Loads the workbook, adds the
+ * image, and saves to outPath — pass the same path as filePath to
+ * overwrite, or a new path to keep the original untouched.
+ */
+export async function insertImage(filePath, sheetName, imagePath, outPath, anchorCell = "A1") {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath);
+
+  let sheet = workbook.getWorksheet(sheetName);
+  if (!sheet) sheet = workbook.addWorksheet(sheetName);
+
+  const imageId = workbook.addImage({
+    filename: imagePath,
+    extension: "png",
+  });
+
+  // Rough size in Excel's column/row grid units — good enough default
+  // for a chart; the user can resize it in Excel afterward.
+  sheet.addImage(imageId, {
+    tl: { col: cellColToIndex(anchorCell), row: cellRowToIndex(anchorCell) },
+    ext: { width: 500, height: 300 },
+  });
+
+  await workbook.xlsx.writeFile(outPath);
+  return outPath;
+}
+
+function cellColToIndex(cellRef) {
+  const match = cellRef.match(/^([A-Z]+)(\d+)$/i);
+  const letters = match[1].toUpperCase();
+  let col = 0;
+  for (let i = 0; i < letters.length; i++) {
+    col = col * 26 + (letters.charCodeAt(i) - 64);
+  }
+  return col - 1; // 0-indexed
+}
+
+function cellRowToIndex(cellRef) {
+  const match = cellRef.match(/^([A-Z]+)(\d+)$/i);
+  return parseInt(match[2], 10) - 1; // 0-indexed
+}
+
+/**
  * Clone an existing workbook's structure/formatting and drop new data
  * into it — this is the "copy another report's format" path. Loads the
  * template, overwrites cell values in-place (keeping styles, merges,

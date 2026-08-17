@@ -166,7 +166,7 @@ export default function App() {
             <textarea
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder='e.g. "Compare Sheet1 in file A with Sheet1 in file B and list the differences", "Fill the Word template with rows from the Excel file", or "Merge these two PDFs and add page numbers"'
+              placeholder='e.g. "Compare Sheet1 in file A with Sheet1 in file B", "Merge these two PDFs and add page numbers", or "Build a 5-slide PowerPoint from this Excel data with a blue theme and a bar chart"'
               rows={3}
               style={{ width: "100%" }}
             />

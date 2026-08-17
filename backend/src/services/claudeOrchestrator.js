@@ -5,6 +5,8 @@ import * as wordService from "./wordService.js";
 import * as pdfService from "./pdfService.js";
 import * as pdfEditService from "./pdfEditService.js";
 import * as emailService from "./emailService.js";
+import * as chartService from "./chartService.js";
+import * as pptxService from "./pptxService.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -287,6 +289,113 @@ const tools = [
       required: ["filePath", "fieldValues", "outPath"],
     },
   },
+  {
+    name: "render_chart_image",
+    description:
+      "Render a chart (bar/line/pie/doughnut) to a PNG image from data. Used to embed a static " +
+      "chart into a Word doc or Excel sheet — not editable afterward. For an editable chart, use " +
+      "create_presentation instead, which builds native PowerPoint charts.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["bar", "line", "pie", "doughnut", "scatter"] },
+        title: { type: "string" },
+        labels: { type: "array", items: { type: "string" } },
+        datasets: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string" },
+              data: { type: "array", items: { type: "number" } },
+            },
+          },
+        },
+        outPath: { type: "string" },
+      },
+      required: ["type", "labels", "datasets", "outPath"],
+    },
+  },
+  {
+    name: "build_word_document",
+    description:
+      "Build a Word document from scratch (title + sections of paragraphs), with an optional " +
+      "chart or other image embedded after any section (pass an imagePath from render_chart_image " +
+      "or elsewhere). Use when there's no existing template to clone.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        sections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              heading: { type: "string" },
+              paragraphs: { type: "array", items: { type: "string" } },
+              imagePath: { type: "string", description: "Optional. Embedded after this section's text." },
+            },
+            required: ["heading", "paragraphs"],
+          },
+        },
+        outPath: { type: "string" },
+      },
+      required: ["title", "sections", "outPath"],
+    },
+  },
+  {
+    name: "insert_excel_image",
+    description:
+      "Embed a PNG image (typically a chart from render_chart_image) into a sheet of an existing " +
+      "Excel workbook, anchored at a cell like 'E2'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePath: { type: "string" },
+        sheetName: { type: "string" },
+        imagePath: { type: "string" },
+        outPath: { type: "string" },
+        anchorCell: { type: "string", description: "e.g. 'E2'. Defaults to 'A1'." },
+      },
+      required: ["filePath", "sheetName", "imagePath", "outPath"],
+    },
+  },
+  {
+    name: "create_presentation",
+    description:
+      "Build a PowerPoint (.pptx) deck from a structured spec: title slides, bullet slides, image " +
+      "slides, table slides, and chart slides. Charts here are native, editable PowerPoint chart " +
+      "objects (better than the static images used in Word/Excel). Supports a custom color theme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        theme: {
+          type: "object",
+          properties: {
+            colors: {
+              type: "array",
+              items: { type: "string" },
+              description: "6 hex colors without '#', e.g. ['4E79A7', 'F28E2B', ...]",
+            },
+            fontFace: { type: "string" },
+          },
+        },
+        slides: {
+          type: "array",
+          items: {
+            type: "object",
+            description:
+              "One of: {type:'title',title,subtitle?}, {type:'bullets',title,bullets}, " +
+              "{type:'image',title?,imagePath}, {type:'table',title?,rows} (rows[0]=header), " +
+              "{type:'chart',title?,chartType,labels,series:[{name,values}]}",
+          },
+        },
+        outPath: { type: "string" },
+      },
+      required: ["slides", "outPath"],
+    },
+  },
 ];
 
 async function executeTool(name, input, context) {
@@ -347,6 +456,26 @@ async function executeTool(name, input, context) {
       return pdfEditService.listFormFields(input.filePath);
     case "fill_pdf_form":
       return pdfEditService.fillForm(input.filePath, input.fieldValues, input.outPath);
+    case "render_chart_image":
+      return chartService.renderChartImage(
+        { type: input.type, title: input.title, labels: input.labels, datasets: input.datasets },
+        input.outPath
+      );
+    case "build_word_document":
+      return wordService.buildWordDoc(input.title, input.sections, input.outPath);
+    case "insert_excel_image":
+      return excelService.insertImage(
+        input.filePath,
+        input.sheetName,
+        input.imagePath,
+        input.outPath,
+        input.anchorCell || "A1"
+      );
+    case "create_presentation":
+      return pptxService.createPresentation(
+        { title: input.title, theme: input.theme, slides: input.slides },
+        input.outPath
+      );
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -389,6 +518,11 @@ export async function runCommand(userCommand, context = {}) {
         "numbers, and fill/flatten PDF form fields (list_pdf_form_fields first to see what's " +
         "available). PDF editing can't rewrite existing body text in place — that's a structural " +
         "limitation of the format, not a missing feature; say so if asked to do that. " +
+        "You can also build PowerPoint decks (create_presentation) with native, editable charts " +
+        "and a custom color theme, and add charts to Word/Excel via render_chart_image plus " +
+        "build_word_document or insert_excel_image — those are static images, not editable " +
+        "afterward, unlike PowerPoint's native charts; mention that distinction if it's relevant " +
+        "to what the user asked for. " +
         "Always explain what you did in plain language in your final response.",
       tools,
       messages,
