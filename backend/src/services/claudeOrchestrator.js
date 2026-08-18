@@ -42,7 +42,11 @@ const tools = [
   },
   {
     name: "diff_excel_sheets",
-    description: "Compare two sheets (2D arrays) cell by cell and return the differences.",
+    description:
+      "Compare two sheets (2D arrays) cell by cell, by RAW POSITION (row/col index) — breaks if " +
+      "rows/columns are reordered between the two files. Prefer reconcile_excel_by_key instead " +
+      "whenever a shared key column exists (e.g. an ID); it matches rows by value, not position, " +
+      "which is what a real comparison usually needs.",
     input_schema: {
       type: "object",
       properties: {
@@ -50,6 +54,30 @@ const tools = [
         sheetB: { type: "array" },
       },
       required: ["sheetA", "sheetB"],
+    },
+  },
+  {
+    name: "reconcile_excel_by_key",
+    description:
+      "Proper lookup-based comparison between two Excel files: matches rows by a key column's " +
+      "VALUE (like VLOOKUP — robust to reordering/inserted rows) and compares fields by HEADER " +
+      "NAME (like HLOOKUP — robust to reordered columns), rather than raw cell position. Writes " +
+      "a real downloadable multi-sheet Excel report (Summary, Only in A, Only in B, Differences) " +
+      "and returns summary counts plus a preview of the first 20 differences. Use this as the " +
+      "default way to compare two spreadsheets whenever they share an identifying column.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filePathA: { type: "string" },
+        sheetNameA: { type: "string", description: "Optional, defaults to the first sheet" },
+        filePathB: { type: "string" },
+        sheetNameB: { type: "string", description: "Optional, defaults to the first sheet" },
+        keyColumn: { type: "string", description: "Header name of the shared identifying column" },
+        labelA: { type: "string", description: "Optional display label for file A in the report" },
+        labelB: { type: "string", description: "Optional display label for file B in the report" },
+        outPath: { type: "string" },
+      },
+      required: ["filePathA", "filePathB", "keyColumn", "outPath"],
     },
   },
   {
@@ -408,6 +436,32 @@ async function executeTool(name, input, context) {
       return excelService.computeValues(input.sheets);
     case "diff_excel_sheets":
       return excelService.diffSheets(input.sheetA, input.sheetB);
+    case "reconcile_excel_by_key": {
+      const { sheets: sheetsA } = await excelService.loadWorkbook(input.filePathA);
+      const { sheets: sheetsB } = await excelService.loadWorkbook(input.filePathB);
+      const nameA = input.sheetNameA || Object.keys(sheetsA)[0];
+      const nameB = input.sheetNameB || Object.keys(sheetsB)[0];
+      const result = excelService.reconcileByKey(
+        sheetsA[nameA] || [],
+        sheetsB[nameB] || [],
+        input.keyColumn
+      );
+      await excelService.writeReconciliationReport(
+        result,
+        input.labelA || "File A",
+        input.labelB || "File B",
+        input.outPath
+      );
+      return {
+        keyColumn: result.keyColumn,
+        matchedCount: result.matchedCount,
+        onlyInACount: result.onlyInA.length,
+        onlyInBCount: result.onlyInB.length,
+        differenceCount: result.differences.length,
+        differencesPreview: result.differences.slice(0, 20),
+        reportSavedTo: input.outPath,
+      };
+    }
     case "write_excel":
       return excelService.writeWorkbook(input.sheetsData, input.outPath, input.sheetName);
     case "fill_excel_template":
@@ -504,6 +558,9 @@ export async function runCommand(userCommand, context = {}) {
         max_tokens: 4096,
         system:
           "You are an office automation assistant. You have tools to read/write Excel, " +
+          "compare two spreadsheets (prefer reconcile_excel_by_key over diff_excel_sheets whenever " +
+          "there's a shared key column — it's far more reliable and produces a real downloadable " +
+          "report), " +
           "fill Word templates, extract PDF data (prefer extract_pdf_tables for real tables when " +
           "it's configured; fall back to extract_pdf_structured or extract_pdf_text if it errors " +
           "saying the service isn't set up), and read .eml emails (including their " +

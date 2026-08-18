@@ -224,6 +224,72 @@ app.post("/api/compare-excel", authenticate, async (req, res) => {
   }
 });
 
+// Proper lookup-based comparison: matches rows by a key column value
+// (not position) and fields by header name (not column index), then
+// writes a real downloadable Excel report rather than returning data
+// for an inline colored grid.
+// Inspect a workbook's sheet names and header row per sheet — used by
+// the frontend to populate sheet/key-column dropdowns before running
+// a comparison, without needing a second file to diff against.
+app.post("/api/excel-info", authenticate, async (req, res) => {
+  const { filePath } = req.body;
+  if (!filePath) return res.status(400).json({ error: "filePath is required" });
+
+  try {
+    const { sheets } = await excelService.loadWorkbook(filePath);
+    const headersBySheet = {};
+    for (const [name, rows] of Object.entries(sheets)) {
+      headersBySheet[name] = (rows[0] || []).map((h) => String(h ?? "").trim());
+    }
+    res.json({ availableSheets: Object.keys(sheets), headersBySheet });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/reconcile-excel", authenticate, async (req, res) => {
+  const { filePathA, sheetNameA, filePathB, sheetNameB, keyColumn, labelA, labelB } = req.body;
+  if (!filePathA || !filePathB || !keyColumn) {
+    return res.status(400).json({ error: "filePathA, filePathB, and keyColumn are required" });
+  }
+
+  try {
+    const { sheets: sheetsA } = await excelService.loadWorkbook(filePathA);
+    const { sheets: sheetsB } = await excelService.loadWorkbook(filePathB);
+
+    const nameA = sheetNameA || Object.keys(sheetsA)[0];
+    const nameB = sheetNameB || Object.keys(sheetsB)[0];
+    const sheetA = sheetsA[nameA] || [];
+    const sheetB = sheetsB[nameB] || [];
+
+    const result = excelService.reconcileByKey(sheetA, sheetB, keyColumn);
+
+    const outDir = userOutputDir(req.user.id);
+    const fileName = `reconciliation-${uuidv4()}.xlsx`;
+    const outPath = path.join(outDir, fileName);
+    await excelService.writeReconciliationReport(
+      result,
+      labelA || "File A",
+      labelB || "File B",
+      outPath
+    );
+
+    res.json({
+      keyColumn: result.keyColumn,
+      matchedCount: result.matchedCount,
+      onlyInACount: result.onlyInA.length,
+      onlyInBCount: result.onlyInB.length,
+      differenceCount: result.differences.length,
+      differencesPreview: result.differences.slice(0, 20),
+      reportUrl: `/api/outputs/${fileName}`,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
 app.post("/api/batch-generate", authenticate, async (req, res) => {
   const { templatePath, dataFilePath, sheetName, filenameField } = req.body;
   if (!templatePath || !dataFilePath) {

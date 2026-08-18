@@ -110,15 +110,24 @@ that org able to help. It cannot see any organization's files or data
 
 ## Coverage of your requirements
 
-- **Compare Excel sheets** → `diff_excel_sheets` tool
-  (`excelService.diffSheets`) for Claude's own reasoning, plus a
-  dedicated `/api/compare-excel` endpoint and a **Compare Excel** tab
-  in the frontend (`frontend/src/components/DiffView.jsx`) showing
-  both sheets side-by-side with differing cells highlighted — not just
-  Claude's text summary. This tab uploads its own two files directly
-  (like Batch templates does) rather than depending on files uploaded
-  elsewhere — each tab is self-contained, so you don't have to visit
-  Command first for the other tabs to have anything to work with.
+- **Compare Excel sheets** → real lookup-based reconciliation, not a
+  positional cell diff. `reconcile_excel_by_key`
+  (`excelService.reconcileByKey`) matches rows between two files by a
+  **key column's value** — like VLOOKUP, robust to rows being
+  reordered or inserted — and compares fields by **header name** —
+  like HLOOKUP, robust to columns moving. It reports rows only in A,
+  rows only in B, and every field-level difference for matched rows,
+  then `writeReconciliationReport` turns that into a real downloadable
+  multi-sheet `.xlsx` (Summary / Only in A / Only in B / Differences)
+  via `/api/reconcile-excel`. The **Compare Excel** tab
+  (`frontend/src/components/DiffView.jsx`) uploads its own two files,
+  auto-detects shared header names to suggest a key column, shows
+  summary counts and a preview inline, and downloads the full report.
+  The older raw positional diff (`diff_excel_sheets`, cell (row,col) to
+  cell (row,col)) still exists for Claude to use via the command box
+  in the rare case there's no shared key column at all, but it's no
+  longer what the UI leads with, since it breaks the moment either
+  file has an inserted or reordered row.
 - **Analyze / report from raw data copying another report's format** →
   `fill_excel_template` (clones formatting, injects new values) or
   `buildWordDoc`/`fillWordTemplate` for narrative reports
